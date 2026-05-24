@@ -263,9 +263,6 @@ const PricingSection = ({ onSelectPlan }) => {
   );
 }
 
-const CheckoutModal = ({ open, setOpen, selectedPlan }) => {
-  const navigate = useNavigate();
-  const schema = z.object({
 const FeaturesSection = () => (
   <section id="features" className="py-20 bg-slate-50 border-t border-slate-200">
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -388,6 +385,10 @@ const FAQSection = () => {
     </section>
   );
 };
+
+const CheckoutModal = ({ open, setOpen, selectedPlan }) => {
+  const navigate = useNavigate();
+  const schema = z.object({
     name: z.string().min(2, "Nama wajib diisi"),
     email: z.string().email("Email tidak valid"),
     phone: z.string().min(9, "No HP wajib diisi"),

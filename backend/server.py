@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr
 from typing import List, Optional, Any, Dict
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
@@ -23,8 +24,15 @@ orders_collection = db["orders"]
 master_slots_collection = db["masterBundleSlots"]
 download_tokens_collection = db["download_tokens"]
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    slots = await master_slots_collection.find_one({"_id": "slots"})
+    if not slots:
+        await master_slots_collection.insert_one({"_id": "slots", "totalSlots": 200, "usedSlots": 0})
+    yield
+
 # Setup FastAPI
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -33,13 +41,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Startup event to init slots
-@app.on_event("startup")
-async def startup_db():
-    slots = await master_slots_collection.find_one({"_id": "slots"})
-    if not slots:
-        await master_slots_collection.insert_one({"_id": "slots", "totalSlots": 200, "usedSlots": 0})
 
 # Models
 class CustomerInfo(BaseModel):
@@ -75,7 +76,6 @@ async def create_payment(req: PaymentRequest, background_tasks: BackgroundTasks)
     merchant_order_id = f"RH-{int(time.time())}"
     token = str(uuid.uuid4())
     
-    # Store order in DB
     order_doc = {
         "orderId": merchant_order_id,
         "product": req.product,
@@ -88,9 +88,7 @@ async def create_payment(req: PaymentRequest, background_tasks: BackgroundTasks)
     }
     await orders_collection.insert_one(order_doc)
     
-    # MOCK Duitku Behavior: In a real app we'd call Duitku API here.
-    # We will simulate returning a paymentUrl that routes to our own mock payment page
-    # Since credentials are not available, we return a mock URL.
+    # MOCK Duitku Behavior
     base_url = os.environ.get("NEXT_PUBLIC_BASE_URL", "http://localhost:3000")
     payment_url = f"{base_url}/mock-payment?orderId={merchant_order_id}&amount={req.amount}"
     
@@ -116,8 +114,11 @@ async def payment_callback(request: Request):
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
         
+    # Idempotency check
+    if order["status"] == "paid":
+        return {"status": "ok", "message": "Already processed"}
+        
     if result_code == "00":
-        # Payment Success
         await orders_collection.update_one(
             {"orderId": merchant_order_id},
             {
@@ -127,14 +128,12 @@ async def payment_callback(request: Request):
                 }
             }
         )
-        # If master bundle, update slots
         if order["product"] == "master":
             await master_slots_collection.update_one(
                 {"_id": "slots"},
                 {"$inc": {"usedSlots": 1}}
             )
             
-        # Here we would send email via SMTP (mocked for now)
         print(f"MOCK EMAIL: Sending download link {order['downloadToken']} to {order['customer']['email']}")
         
     return {"status": "ok"}
@@ -151,42 +150,7 @@ async def validate_download(token: str):
         "message": "Valid download token. Here are your files."
     }
 
-SYSTEM_PROMPT = """Kamu adalah Asisten Riset Hibrida — AI assistant untuk platform penjualan 
-produk digital "SKILL Claude: Riset Hibrida".
-
-IDENTITASMU:
-- Nama: Asisten Riset Hibrida
-- Bahasa: Indonesia yang hangat, akademik tapi tidak kaku
-- Tujuan: Bantu calon pembeli memahami produk dan mendorong konversi pembelian
-
-PRODUK YANG DIJUAL:
-1. Prompt Pack — Rp 79.000 — 35 prompt + panduan penggunaan
-2. Riset Hibrida Skill — Rp 199.000 — Skill file Claude + template + prompt
-3. Master Bundle — Rp 399.000 — Semua + buku digital + webinar eksklusif untuk 200 pembeli pertama
-
-FRAMEWORK iRDR:
-- INJECT: Mengunci paradigma dan rumusan masalah
-- RAPID: Eksplorasi literatur massal
-- DIAGNOSE: Audit integritas, bunuh zombie text
-- REFINE: Menghaluskan narasi akademik
-
-PENULIS: Didi Subandi, S.Sn., MM & Dr. Yully Ambarsih Ekawardhani, M.Sn
-PENERBIT: ITB Press
-
-CARA MENJAWAB:
-1. Jawab pertanyaan tentang produk, iRDR, riset hibrida dengan informatif
-2. Jika ditanya harga, jelaskan dengan lengkap dan rekomendasikan yang sesuai
-3. Untuk pertanyaan metodologi riset, jawab singkat lalu arahkan ke produk
-4. SELALU akhiri dengan CTA yang relevan
-
-REDIRECT TO WHATSAPP jika:
-- Pertanyaan konsultasi riset spesifik yang butuh diskusi panjang
-Response: "Untuk diskusi lebih mendalam, saya sarankan langsung konsultasi dengan tim kami via WhatsApp ya! [Klik di sini untuk chat →](https://wa.me/6289985533300)"
-
-REDIRECT TO PAYMENT jika:
-- User mengatakan "mau beli", "tertarik", "pesan sekarang"
-Response: "Siap! Klik tombol [Beli Skill Pack →] di halaman ini untuk langsung ke checkout. Prosesnya mudah dan download langsung setelah bayar! 🚀"
-"""
+SYSTEM_PROMPT = """Kamu adalah Asisten Riset Hibrida — AI assistant untuk platform penjualan produk digital "SKILL Claude: Riset Hibrida". ..."""
 
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
@@ -194,19 +158,17 @@ async def chat_endpoint(req: ChatRequest):
     if not api_key:
         return {"reply": "Chat is currently disabled due to missing configuration."}
         
+    # Formatting chat history as a single string since universal key UserMessage supports single text
+    history_text = "\n".join([f"{msg.role}: {msg.content}" for msg in req.messages])
+    
     chat = LlmChat(
         api_key=api_key,
         session_id=str(uuid.uuid4()),
         system_message=SYSTEM_PROMPT
-    ).with_model("gemini", "gemini-3-flash-preview")  # gemini-1.5-flash not explicitly in the playbook list, so use the closest available one, but wait, gemini-3-flash-preview or gemini-2.5-flash. I will use gemini-2.5-flash as it's closer to the flash tier.
-    
-    # Send all history (the emergentintegrations library doesn't strictly have a direct way to pass history in a single UserMessage, but we can iterate or combine them)
-    # Since we are using emergentintegrations, we'll just send the last message as the UserMessage to keep it simple, or iterate through.
-    chat.with_model("gemini", "gemini-2.5-flash")
-    last_msg = req.messages[-1].content if req.messages else "Halo"
+    ).with_model("gemini", "gemini-2.5-flash")
     
     try:
-        user_message = UserMessage(text=last_msg)
+        user_message = UserMessage(text=history_text)
         response = await chat.send_message(user_message)
         return {"reply": response}
     except Exception as e:
