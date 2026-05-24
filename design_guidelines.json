@@ -1,0 +1,97 @@
+{
+  "theme": "Light with Dark Navy Hero",
+  "archetype": "Swiss & High-Contrast blended with Luxury",
+  "colors": {
+    "primary": "#0F172A",
+    "accent_gold": "#D4A017",
+    "background_light": "#F8FAFC",
+    "surface": "#FFFFFF",
+    "surface_subdued": "#F1F5F9",
+    "text_dark": "#0F172A",
+    "text_light": "#F8FAFC",
+    "text_muted": "#64748B",
+    "whatsapp_green": "#25D366",
+    "alert_red": "#EF4444"
+  },
+  "typography": {
+    "heading_font": "Cabinet Grotesk",
+    "body_font": "IBM Plex Sans",
+    "rules": [
+      "H1 tracking-tighter, leading-none, max text-6xl",
+      "H2 tracking-tight, text-3xl md:text-4xl",
+      "Body tracking-normal, leading-relaxed",
+      "Overlines uppercase, tracking-[0.2em]"
+    ]
+  },
+  "layout_and_spacing": {
+    "philosophy": "Generous spacing. p-8 or p-12 for containers.",
+    "grid_strategy": "Bento Grid for Marketing/Problem sections. Control Room Grid for 'What's Inside' features.",
+    "container_max": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "hero_section": "Dark navy (#0F172A) background, split layout. Hero image on right/center. Gold (#D4A017) accent pill."
+  },
+  "components": {
+    "buttons": "Rounded-md (subtle). Primary uses Gold (#D4A017). Hover transform -translate-y-1, transition-transform. Always explicitly set hover text color.",
+    "cards": "Subtle border (border-slate-200), flat background (#FFFFFF), no heavy drop shadows unless hovered (shadow-lg).",
+    "pricing_featured": "Elevated card (-translate-y-4 on desktop), gold border (border-[#D4A017]), shadow-xl shadow-[#D4A017]/10. Solid Gold CTA.",
+    "inputs": "Shadcn UI customized. border-slate-300, focus:ring-2 focus:ring-[#0F172A]."
+  },
+  "motion_and_interactions": {
+    "hover_states": "Buttons and interactive cards lift slightly and increase contrast.",
+    "entrance": "Staggered fade-up for grid items using Framer Motion.",
+    "scroll": "Smooth scrolling (Lenis style or CSS scroll-behavior: smooth)."
+  },
+  "media_and_assets": {
+    "images": [
+      {
+        "category": "hero_cover",
+        "url": "https://customer-assets.emergentagent.com/job_31dea077-4193-4875-aa87-5e1c31174f93/artifacts/9hudhv8w_COVER.png",
+        "description": "Main digital product bundle cover. Use in Hero section."
+      },
+      {
+        "category": "brand_logo",
+        "url": "https://risethibrida.com/wp-content/uploads/2026/04/cropped-itbpress-color.png",
+        "description": "ITB Press Publisher Logo. Display in Trust Indicators and Footer."
+      },
+      {
+        "category": "physical_book_1",
+        "url": "https://risethibrida.com/wp-content/uploads/2026/04/buatkan_mockup_background_202604140021-1024x572.jpeg",
+        "description": "Mockup of Riset Hibrida 2.0 book. Use in Secondary/Books Section."
+      },
+      {
+        "category": "physical_book_2",
+        "url": "https://risethibrida.com/wp-content/uploads/2026/04/buatkan_mockup_background_202604140023-1024x572.jpeg",
+        "description": "Mockup of Protokol Riset Hibrida 2.1 book. Use in Secondary/Books Section."
+      },
+      {
+        "category": "webinar_certificate_mockup",
+        "url": "https://static.prod-images.emergentagent.com/jobs/31dea077-4193-4875-aa87-5e1c31174f93/images/487f0c904467e55b4f1483e6ff5010638ad97393b9af161f6925a5dd7e34c2e3.png",
+        "description": "Premium academic certificate mockup for the Master Bundle promo banner."
+      }
+    ],
+    "icons_library": "@phosphor-icons/react (Duotone weight for high-end academic feel)"
+  },
+  "instructions_to_main_agent": [
+    "CRITICAL: The frontend codebase uses React + .js (JSX) files, NOT .tsx (TypeScript). Please write all React code in standard .jsx/.js format without TypeScript types.",
+    "CRITICAL: The tech stack has been updated to React + FastAPI (Python). DO NOT use Next.js or Express.",
+    "Use Emergent LLM Key (Universal Key) for the Gemini Chatbot instead of the Google AI Studio Key.",
+    "Since Duitku and Email credentials are pending, implement configurable/mocked flows for checkout, payment callback, and email delivery. Mock the `/api/create-payment` and `/api/payment-callback` logic in FastAPI.",
+    "Hero Section MUST use dark navy (#0F172A) background and gold (#D4A017) text accents, with the provided hero_cover image.",
+    "Implement the 'Urgency Banner' in the Hero section with a simulated dynamic counter for the 200 master bundle slots.",
+    "The 4 phase iRDR section should be a horizontal scroll on mobile and a 4-column grid on desktop.",
+    "The 'What's Inside' section must be an 8-item grid.",
+    "Pricing section must feature the 'Skill Pack' prominently (border highlight, gold button).",
+    "Checkout Flow should be a Modal triggered by any 'Beli' button, containing the order form fields.",
+    "Implement the floating AI Assistant Chatbot using the provided SYSTEM_PROMPT. It must slide up from the bottom.",
+    "Include a separate sticky WhatsApp button (Bottom-Left) using the #25D366 brand color.",
+    "The 'Secondary Section' for Physical Books must be visually subdued (e.g. bg-slate-100) compared to the main digital pricing section.",
+    "Testimonials section should use standard 5-star ratings.",
+    "Include 'data-testid' on all interactive elements: buttons, form inputs, links, chat toggle.",
+    "Do NOT use generic placeholders for images. Strictly rely on the media_and_assets array provided.",
+    "Ensure Shadcn UI components are installed and utilized where applicable (e.g., Dialog for Checkout, Accordion for FAQ, Inputs for forms)."
+  ],
+  "accessibility": [
+    "Ensure minimum 4.5:1 contrast for normal text and 3:1 for large text.",
+    "Include aria-labels for the chat and WhatsApp floating buttons.",
+    "Form inputs in the Checkout Modal must have clearly associated labels."
+  ]
+}
