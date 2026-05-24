@@ -9,6 +9,71 @@ import { Toaster, toast } from 'sonner';
 
 const API_URL = process.env.REACT_APP_BACKEND_URL;
 
+const PRICE_STARTER = 79000;
+const PRICE_SKILL = 199000;
+const PRICE_MASTER = 399000;
+
+const PROBLEM_CARDS = [
+  { id: 'prob-1', icon: "🧟‍♂️", title: "Zombie Text", desc: "Output AI yang panjang tapi tidak berjiwa. Revisi tanpa akhir." },
+  { id: 'prob-2', icon: "🎭", title: "Halusinasi Referensi", desc: "AI mengarang jurnal yang tidak ada. Malu di depan penguji." },
+  { id: 'prob-3', icon: "❌", title: "Tanpa Metodologi", desc: "Cepat menghasilkan teks, tapi tidak bisa dipertanggungjawabkan secara akademik." }
+];
+
+const IRDR_PHASES = [
+  { id: 'phase-1', icon: "🔵", name: "INJECT", desc: "Mengunci paradigma & rumusan masalah. Fondasi riset yang tidak bisa digoyang." },
+  { id: 'phase-2', icon: "🟢", name: "RAPID", desc: "Eksplorasi literatur massal. Peta diskursus ilmiah dalam hitungan menit." },
+  { id: 'phase-3', icon: "🔴", name: "DIAGNOSE", desc: "Membunuh zombie text & halusinasi. Audit integritas sebelum terlambat." },
+  { id: 'phase-4', icon: "🟡", name: "REFINE", desc: "Menghaluskan narasi akademik. Suara peneliti tetap terdengar." }
+];
+
+const BUNDLE_FEATURES = [
+  { id: "feat-irdr", title: "Framework iRDR", desc: "Peta kolaborasi manusia-AI yang terstruktur" },
+  { id: "feat-rag", title: "Teknik R.A.G.", desc: "AI menjawab berbasis data nyata, bukan halusinasi" },
+  { id: "feat-sense", title: "Sensory Grounding", desc: "Turun ke lapangan sebelum bertanya ke AI" },
+  { id: "feat-tri", title: "Triangulasi Data", desc: "Validasi dari tiga arah" },
+  { id: "feat-dezom", title: "De-zombifikasi", desc: "Menghidupkan kembali teks tanpa jiwa" },
+  { id: "feat-dig", title: "Dignity Check", desc: "Lima pertanyaan sebelum tanda tangan" },
+  { id: "feat-case", title: "Studi Kasus", desc: "Ahmad, Rina, Budi — tiga jalur berbeda" },
+  { id: "feat-prompt", title: "35 Prompt Siap Pakai", desc: "Terstruktur per fase iRDR" }
+];
+
+const TESTIMONIALS = [
+  { id: "test-1", quote: "Buku ini memberi perspektif baru tentang bagaimana AI dapat digunakan secara cerdas dalam penelitian. Bukan sekadar cepat, tetapi tetap menjaga kualitas dan integritas akademik.", author: "Dr. Rina Kurniasih, Dosen & Peneliti" },
+  { id: "test-2", quote: "Bahasanya jelas, aplikatif, dan langsung bisa dipraktikkan. Saya jadi lebih paham bagaimana memanfaatkan AI untuk menyusun proposal, analisis data, hingga penulisan tesis.", author: "Andi Pratama, Mahasiswa Pascasarjana" },
+  { id: "test-3", quote: "Referensi yang relevan untuk kampus masa kini. Buku ini menjembatani kebutuhan akademik tradisional dengan transformasi digital yang sedang berlangsung.", author: "Prof. Budi Santoso, Akademisi & Reviewer Jurnal" }
+];
+
+const FAQS = [
+  { id: "faq-1", q: "Apa perbedaan Skill Pack dan Master Bundle?", a: "Skill Pack berisi semua tools untuk mulai (SKILL file, 35 prompt, template). Master Bundle menambahkan dua buku digital, prompt khusus per disiplin ilmu, rekaman webinar, dan update seumur hidup + bonus eksklusif 200 pembeli pertama." },
+  { id: "faq-2", q: "Apakah saya perlu berlangganan Claude Pro?", a: "Tidak wajib. Claude versi gratis sudah bisa menggunakan SKILL file di Projects. Namun Claude Pro memberikan lebih banyak pesan per hari." },
+  { id: "faq-3", q: "Bagaimana cara menginstal SKILL file ke Claude?", a: "Mudah — buka claude.ai, buat Project baru, paste isi SKILL file ke 'Project instructions'. Panduan instalasi sudah ada di dalam paket." },
+  { id: "faq-4", q: "Bagaimana cara mendapat link download setelah bayar?", a: "Otomatis — link download dikirim ke email Anda dalam 5 menit setelah pembayaran terkonfirmasi. Cek folder spam jika tidak menerima." }
+];
+
+const fadeInConfig = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 }
+};
+
+const modalConfig = {
+  initial: { opacity: 0, scale: 0.95 },
+  animate: { opacity: 1, scale: 1 },
+  exit: { opacity: 0, scale: 0.95 }
+};
+
+const imageConfig = {
+  initial: { y: 20, opacity: 0 },
+  animate: { y: 0, opacity: 1 },
+  transition: { duration: 0.8 }
+};
+
+const chatModalConfig = {
+  initial: { opacity: 0, y: 50 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: 50 }
+};
+
 // --- SHADCN-LIKE UI COMPONENTS ---
 const Button = React.forwardRef(({ className = "", variant = "primary", size = "default", ...props }, ref) => {
   const baseStyle = "inline-flex items-center justify-center rounded-md font-medium transition-all focus:outline-none focus:ring-2 focus:ring-navy focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none hover:-translate-y-1";
@@ -54,16 +119,12 @@ const Dialog = ({ open, onOpenChange, children }) => (
     {open && (
       <div className="fixed inset-0 z-50 flex items-center justify-center">
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          {...fadeInConfig}
           onClick={() => onOpenChange(false)}
           className="fixed inset-0 bg-black/50 backdrop-blur-sm"
         />
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          exit={{ opacity: 0, scale: 0.95 }}
+          {...modalConfig}
           className="z-50 w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl overflow-y-auto max-h-[90vh]"
         >
           {children}
@@ -83,6 +144,7 @@ const HeroSection = () => {
       .then(r => r.json())
       .then(d => setSlots(d.remaining))
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -124,9 +186,7 @@ const HeroSection = () => {
 
         <div className="relative">
           <motion.img 
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.8 }}
+            {...imageConfig}
             src="https://customer-assets.emergentagent.com/job_31dea077-4193-4875-aa87-5e1c31174f93/artifacts/9hudhv8w_COVER.png" 
             alt="Skill Claude Book Cover" 
             className="rounded-2xl shadow-2xl shadow-gold/20 w-full max-w-md mx-auto"
@@ -150,12 +210,8 @@ const ProblemSection = () => (
       </div>
 
       <div className="grid md:grid-cols-3 gap-8">
-        {[
-          { icon: "🧟‍♂️", title: "Zombie Text", desc: "Output AI yang panjang tapi tidak berjiwa. Revisi tanpa akhir." },
-          { icon: "🎭", title: "Halusinasi Referensi", desc: "AI mengarang jurnal yang tidak ada. Malu di depan penguji." },
-          { icon: "❌", title: "Tanpa Metodologi", desc: "Cepat menghasilkan teks, tapi tidak bisa dipertanggungjawabkan secara akademik." }
-        ].map((item, i) => (
-          <div key={i} className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center hover:-translate-y-2 transition-transform duration-300">
+        {PROBLEM_CARDS.map((item) => (
+          <div key={item.id} className="bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center hover:-translate-y-2 transition-transform duration-300">
             <div className="text-5xl mb-4">{item.icon}</div>
             <h3 className="text-xl font-bold text-navy mb-2">{item.title}</h3>
             <p className="text-slate-600">{item.desc}</p>
@@ -173,13 +229,8 @@ const IRDRSection = () => (
         Proses Framework iRDR
       </h2>
       <div className="flex overflow-x-auto md:grid md:grid-cols-4 gap-6 pb-8 snap-x">
-        {[
-          { icon: "🔵", name: "INJECT", desc: "Mengunci paradigma & rumusan masalah. Fondasi riset yang tidak bisa digoyang." },
-          { icon: "🟢", name: "RAPID", desc: "Eksplorasi literatur massal. Peta diskursus ilmiah dalam hitungan menit." },
-          { icon: "🔴", name: "DIAGNOSE", desc: "Membunuh zombie text & halusinasi. Audit integritas sebelum terlambat." },
-          { icon: "🟡", name: "REFINE", desc: "Menghaluskan narasi akademik. Suara peneliti tetap terdengar." }
-        ].map((phase, i) => (
-          <div key={i} className="min-w-[280px] bg-slate-50 p-6 rounded-xl border border-slate-100 snap-center">
+        {IRDR_PHASES.map((phase) => (
+          <div key={phase.id} className="min-w-[280px] bg-slate-50 p-6 rounded-xl border border-slate-100 snap-center">
             <div className="flex items-center gap-3 mb-4">
               <span className="text-2xl">{phase.icon}</span>
               <h3 className="text-xl font-bold tracking-widest text-navy">{phase.name}</h3>
@@ -205,7 +256,7 @@ const PricingSection = ({ onSelectPlan }) => {
           {/* STARTER */}
           <div className="bg-white rounded-2xl p-8 shadow-xl">
             <h3 className="text-2xl font-bold text-navy mb-2">Prompt Pack</h3>
-            <div className="text-3xl font-display font-bold text-gold mb-2">Rp 79.000</div>
+            <div className="text-3xl font-display font-bold text-gold mb-2">Rp {PRICE_STARTER.toLocaleString('id-ID')}</div>
             <p className="text-slate-500 text-sm mb-6">Mahasiswa S1 yang baru mulai</p>
             <ul className="space-y-4 mb-8">
               <li className="flex items-center gap-2"><CheckCircle className="text-whatsapp"/> 35 Prompt Siap Pakai</li>
@@ -213,7 +264,7 @@ const PricingSection = ({ onSelectPlan }) => {
               <li className="flex items-center gap-2 text-slate-400"><X className="text-red-400"/> Skill File untuk Claude</li>
               <li className="flex items-center gap-2 text-slate-400"><X className="text-red-400"/> Template Dokumen</li>
             </ul>
-            <Button className="w-full" variant="outline" onClick={() => onSelectPlan('starter', 79000, 'Prompt Pack')} data-testid="buy-starter">
+            <Button className="w-full" variant="outline" onClick={() => onSelectPlan('starter', PRICE_STARTER, 'Prompt Pack')} data-testid="buy-starter">
               Beli Prompt Pack →
             </Button>
           </div>
@@ -224,7 +275,7 @@ const PricingSection = ({ onSelectPlan }) => {
               🔥 PALING LAKU
             </div>
             <h3 className="text-2xl font-bold text-navy mb-2">Riset Hibrida Skill</h3>
-            <div className="text-4xl font-display font-bold text-navy mb-2">Rp 199.000</div>
+            <div className="text-4xl font-display font-bold text-navy mb-2">Rp {PRICE_SKILL.toLocaleString('id-ID')}</div>
             <p className="text-slate-500 text-sm mb-6">Mahasiswa S2/S3 & Dosen</p>
             <ul className="space-y-4 mb-8 font-medium">
               <li className="flex items-center gap-2"><CheckCircle className="text-whatsapp"/> Semua isi Starter Pack</li>
@@ -233,7 +284,7 @@ const PricingSection = ({ onSelectPlan }) => {
               <li className="flex items-center gap-2"><CheckCircle className="text-whatsapp"/> Template Research Blueprint</li>
               <li className="flex items-center gap-2"><CheckCircle className="text-whatsapp"/> Template Synthesis Matrix</li>
             </ul>
-            <Button className="w-full" variant="primary" onClick={() => onSelectPlan('skill', 199000, 'Riset Hibrida Skill')} data-testid="buy-skill">
+            <Button className="w-full" variant="primary" onClick={() => onSelectPlan('skill', PRICE_SKILL, 'Riset Hibrida Skill')} data-testid="buy-skill">
               Beli Skill Pack →
             </Button>
           </div>
@@ -241,7 +292,7 @@ const PricingSection = ({ onSelectPlan }) => {
           {/* MASTER */}
           <div className="bg-white rounded-2xl p-8 shadow-xl">
             <h3 className="text-2xl font-bold text-navy mb-2">Master Bundle 🏆</h3>
-            <div className="text-3xl font-display font-bold text-gold mb-2">Rp 399.000</div>
+            <div className="text-3xl font-display font-bold text-gold mb-2">Rp {PRICE_MASTER.toLocaleString('id-ID')}</div>
             <p className="text-slate-500 text-sm mb-6">Komplit + Webinar Eksklusif</p>
             <ul className="space-y-4 mb-8">
               <li className="flex items-center gap-2"><CheckCircle className="text-whatsapp"/> Semua isi Skill Pack</li>
@@ -253,7 +304,7 @@ const PricingSection = ({ onSelectPlan }) => {
                 <span>BONUS 200 Pembeli Pertama: Undangan Webinar & Sertifikat SPAK/BKD</span>
               </li>
             </ul>
-            <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={() => onSelectPlan('master', 399000, 'Master Bundle')} data-testid="buy-master">
+            <Button className="w-full bg-red-600 hover:bg-red-700 text-white" onClick={() => onSelectPlan('master', PRICE_MASTER, 'Master Bundle')} data-testid="buy-master">
               Klaim Master Bundle →
             </Button>
           </div>
@@ -270,17 +321,8 @@ const FeaturesSection = () => (
         Apa yang Ada di Dalam Bundle
       </h2>
       <div className="grid md:grid-cols-4 gap-6">
-        {[
-          { title: "Framework iRDR", desc: "Peta kolaborasi manusia-AI yang terstruktur" },
-          { title: "Teknik R.A.G.", desc: "AI menjawab berbasis data nyata, bukan halusinasi" },
-          { title: "Sensory Grounding", desc: "Turun ke lapangan sebelum bertanya ke AI" },
-          { title: "Triangulasi Data", desc: "Validasi dari tiga arah" },
-          { title: "De-zombifikasi", desc: "Menghidupkan kembali teks tanpa jiwa" },
-          { title: "Dignity Check", desc: "Lima pertanyaan sebelum tanda tangan" },
-          { title: "Studi Kasus", desc: "Ahmad, Rina, Budi — tiga jalur berbeda" },
-          { title: "35 Prompt Siap Pakai", desc: "Terstruktur per fase iRDR" }
-        ].map((feat, i) => (
-          <div key={i} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
+        {BUNDLE_FEATURES.map((feat) => (
+          <div key={feat.id} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
             <h3 className="font-bold text-navy mb-2">{feat.title}</h3>
             <p className="text-sm text-slate-600">{feat.desc}</p>
           </div>
@@ -295,23 +337,10 @@ const TestimonialsSection = () => (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <h2 className="text-3xl md:text-4xl font-display font-bold text-center mb-16">Apa Kata Mereka?</h2>
       <div className="grid md:grid-cols-3 gap-8">
-        {[
-          {
-            quote: "Buku ini memberi perspektif baru tentang bagaimana AI dapat digunakan secara cerdas dalam penelitian. Bukan sekadar cepat, tetapi tetap menjaga kualitas dan integritas akademik.",
-            author: "Dr. Rina Kurniasih, Dosen & Peneliti"
-          },
-          {
-            quote: "Bahasanya jelas, aplikatif, dan langsung bisa dipraktikkan. Saya jadi lebih paham bagaimana memanfaatkan AI untuk menyusun proposal, analisis data, hingga penulisan tesis.",
-            author: "Andi Pratama, Mahasiswa Pascasarjana"
-          },
-          {
-            quote: "Referensi yang relevan untuk kampus masa kini. Buku ini menjembatani kebutuhan akademik tradisional dengan transformasi digital yang sedang berlangsung.",
-            author: "Prof. Budi Santoso, Akademisi & Reviewer Jurnal"
-          }
-        ].map((t, i) => (
-          <div key={i} className="bg-navy-light p-8 rounded-2xl border border-slate-700">
+        {TESTIMONIALS.map((t) => (
+          <div key={t.id} className="bg-navy-light p-8 rounded-2xl border border-slate-700">
             <div className="flex gap-1 mb-4 text-gold">
-              {[...Array(5)].map((_, idx) => <Star key={idx} weight="fill" />)}
+              {[...Array(5)].map((_, idx) => <Star key={`star-${idx}`} weight="fill" />)}
             </div>
             <p className="italic text-slate-300 mb-6">"{t.quote}"</p>
             <div className="font-bold text-white">— {t.author}</div>
@@ -356,19 +385,13 @@ const WebinarPromo = () => (
 );
 
 const FAQSection = () => {
-  const faqs = [
-    { q: "Apa perbedaan Skill Pack dan Master Bundle?", a: "Skill Pack berisi semua tools untuk mulai (SKILL file, 35 prompt, template). Master Bundle menambahkan dua buku digital, prompt khusus per disiplin ilmu, rekaman webinar, dan update seumur hidup + bonus eksklusif 200 pembeli pertama." },
-    { q: "Apakah saya perlu berlangganan Claude Pro?", a: "Tidak wajib. Claude versi gratis sudah bisa menggunakan SKILL file di Projects. Namun Claude Pro memberikan lebih banyak pesan per hari." },
-    { q: "Bagaimana cara menginstal SKILL file ke Claude?", a: "Mudah — buka claude.ai, buat Project baru, paste isi SKILL file ke 'Project instructions'. Panduan instalasi sudah ada di dalam paket." },
-    { q: "Bagaimana cara mendapat link download setelah bayar?", a: "Otomatis — link download dikirim ke email Anda dalam 5 menit setelah pembayaran terkonfirmasi. Cek folder spam jika tidak menerima." }
-  ];
   return (
     <section className="py-20 bg-white">
       <div className="max-w-3xl mx-auto px-4">
         <h2 className="text-3xl font-display font-bold text-navy text-center mb-10">Tanya Jawab (FAQ)</h2>
         <div className="space-y-4">
-          {faqs.map((faq, i) => (
-            <details key={i} className="group bg-slate-50 rounded-lg border border-slate-200">
+          {FAQS.map((faq) => (
+            <details key={faq.id} className="group bg-slate-50 rounded-lg border border-slate-200">
               <summary className="flex justify-between items-center font-medium cursor-pointer list-none p-4 text-navy">
                 <span>{faq.q}</span>
                 <span className="transition group-open:rotate-180">
@@ -487,7 +510,7 @@ const ChatbotWidget = () => {
 
   useEffect(() => {
     if(scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages]);
+  }, [messages, scrollRef]);
 
   const send = async (text) => {
     if(!text.trim()) return;
@@ -526,7 +549,7 @@ const ChatbotWidget = () => {
             </div>
             <div className="flex-1 p-4 overflow-y-auto bg-slate-50 space-y-4" ref={scrollRef}>
               {messages.map((m, i) => (
-                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div key={`msg-${i}`} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={`max-w-[80%] p-3 rounded-lg text-sm ${m.role === 'user' ? 'bg-gold text-white rounded-br-none' : 'bg-white border border-slate-200 text-navy rounded-bl-none'}`}>
                     {m.content}
                   </div>
@@ -689,7 +712,7 @@ const DownloadPage = () => {
         else setStatus('error');
       })
       .catch(() => setStatus('error'));
-  }, [token]);
+  }, [token, setStatus]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
