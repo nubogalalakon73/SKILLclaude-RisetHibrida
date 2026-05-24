@@ -511,7 +511,7 @@ const ChatbotWidget = () => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 z-40">
+    <div className="fixed bottom-24 right-6 z-50">
       <AnimatePresence>
         {open && (
           <motion.div
@@ -564,7 +564,7 @@ const WhatsAppWidget = () => (
   <a 
     href="https://wa.me/6289985533300?text=Halo%2C%20saya%20ingin%20konsultasi%20riset%20dan%20jurnal%20dari%20website%20Skill%20Claude%20Riset%20Hibrida"
     target="_blank" rel="noopener noreferrer"
-    className="fixed bottom-6 left-6 z-40 bg-whatsapp text-white px-4 py-3 rounded-full flex items-center gap-3 shadow-xl hover:scale-105 transition-transform"
+    className="fixed bottom-24 left-6 z-50 bg-whatsapp text-white px-4 py-3 rounded-full flex items-center gap-3 shadow-xl hover:scale-105 transition-transform"
     data-testid="wa-widget"
     aria-label="Chat WhatsApp"
   >
