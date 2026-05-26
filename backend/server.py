@@ -1,21 +1,20 @@
+import asyncio
+import datetime
 import os
 import time
-import hashlib
 import uuid
-import datetime
+
+import google.generativeai as genai
+from contextlib import asynccontextmanager
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional, Any, Dict
 from motor.motor_asyncio import AsyncIOMotorClient
-from dotenv import load_dotenv
-from contextlib import asynccontextmanager
-
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from pydantic import BaseModel, EmailStr
+from typing import List, Optional
 
 load_dotenv()
 
-# Setup MongoDB
 MONGO_URL = os.environ.get("MONGO_URL", "mongodb://localhost:27017")
 DB_NAME = os.environ.get("DB_NAME", "riset_hibrida")
 client = AsyncIOMotorClient(MONGO_URL)
@@ -31,18 +30,18 @@ async def lifespan(app: FastAPI):
         await master_slots_collection.insert_one({"_id": "slots", "totalSlots": 200, "usedSlots": 0})
     yield
 
-# Setup FastAPI
 app = FastAPI(lifespan=lifespan)
 
+_cors_origins_raw = os.environ.get("CORS_ORIGINS", "*")
+_cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Models
 class CustomerInfo(BaseModel):
     name: str
     email: EmailStr
@@ -51,7 +50,7 @@ class CustomerInfo(BaseModel):
     job: str
 
 class PaymentRequest(BaseModel):
-    product: str # starter | skill | master
+    product: str
     amount: int
     customer: CustomerInfo
 
@@ -62,7 +61,6 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
 
-# Endpoints
 @app.get("/api/slots")
 async def get_slots():
     slots = await master_slots_collection.find_one({"_id": "slots"})
@@ -75,7 +73,7 @@ async def get_slots():
 async def create_payment(req: PaymentRequest, background_tasks: BackgroundTasks):
     merchant_order_id = f"RH-{int(time.time())}"
     token = str(uuid.uuid4())
-    
+
     order_doc = {
         "orderId": merchant_order_id,
         "product": req.product,
@@ -84,58 +82,45 @@ async def create_payment(req: PaymentRequest, background_tasks: BackgroundTasks)
         "customer": req.customer.dict(),
         "downloadToken": token,
         "createdAt": datetime.datetime.utcnow(),
-        "paidAt": None
+        "paidAt": None,
     }
     await orders_collection.insert_one(order_doc)
-    
-    # MOCK Duitku Behavior
-    base_url = os.environ.get("NEXT_PUBLIC_BASE_URL", "http://localhost:3000")
+
+    base_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
     payment_url = f"{base_url}/mock-payment?orderId={merchant_order_id}&amount={req.amount}"
-    
-    return {
-        "merchantOrderId": merchant_order_id,
-        "paymentUrl": payment_url
-    }
+
+    return {"merchantOrderId": merchant_order_id, "paymentUrl": payment_url}
 
 @app.post("/api/payment-callback")
 async def payment_callback(request: Request):
     try:
         payload = await request.json()
-    except:
+    except Exception:
         payload = {}
-        
+
     merchant_order_id = payload.get("merchantOrderId")
     result_code = payload.get("resultCode")
-    
+
     if not merchant_order_id:
         raise HTTPException(status_code=400, detail="Missing order ID")
-        
+
     order = await orders_collection.find_one({"orderId": merchant_order_id})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-        
-    # Idempotency check
+
     if order["status"] == "paid":
         return {"status": "ok", "message": "Already processed"}
-        
+
     if result_code == "00":
         await orders_collection.update_one(
             {"orderId": merchant_order_id},
-            {
-                "$set": {
-                    "status": "paid",
-                    "paidAt": datetime.datetime.utcnow()
-                }
-            }
+            {"$set": {"status": "paid", "paidAt": datetime.datetime.utcnow()}},
         )
         if order["product"] == "master":
             await master_slots_collection.update_one(
-                {"_id": "slots"},
-                {"$inc": {"usedSlots": 1}}
+                {"_id": "slots"}, {"$inc": {"usedSlots": 1}}
             )
-            
-        print(f"MOCK EMAIL: Sending download link {order['downloadToken']} to {order['customer']['email']}")
-        
+
     return {"status": "ok"}
 
 @app.get("/api/download/{token}")
@@ -143,11 +128,10 @@ async def validate_download(token: str):
     order = await orders_collection.find_one({"downloadToken": token, "status": "paid"})
     if not order:
         raise HTTPException(status_code=404, detail="Invalid token or payment not completed")
-    
     return {
         "status": "success",
         "product": order["product"],
-        "message": "Valid download token. Here are your files."
+        "message": "Valid download token. Here are your files.",
     }
 
 SYSTEM_PROMPT = """Kamu adalah Asisten Penjualan untuk "SKILL Claude: Riset Hibrida".
@@ -220,23 +204,20 @@ DILARANG:
 
 @app.post("/api/chat")
 async def chat_endpoint(req: ChatRequest):
-    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("EMERGENT_LLM_KEY")
     if not api_key:
         return {"reply": "Chat is currently disabled due to missing configuration."}
-        
-    # Formatting chat history as a single string since universal key UserMessage supports single text
+
     history_text = "\n".join([f"{msg.role}: {msg.content}" for msg in req.messages])
-    
-    chat = LlmChat(
-        api_key=api_key,
-        session_id=str(uuid.uuid4()),
-        system_message=SYSTEM_PROMPT
-    ).with_model("gemini", "gemini-2.5-flash")
-    
+
     try:
-        user_message = UserMessage(text=history_text)
-        response = await chat.send_message(user_message)
-        return {"reply": response}
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(
+            model_name="gemini-1.5-flash",
+            system_instruction=SYSTEM_PROMPT,
+        )
+        response = await asyncio.to_thread(model.generate_content, history_text)
+        return {"reply": response.text}
     except Exception as e:
         print("Chat Error:", str(e))
         return {"reply": "Maaf, sistem sedang mengalami kendala. Silakan coba lagi nanti."}
