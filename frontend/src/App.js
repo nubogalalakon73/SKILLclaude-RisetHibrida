@@ -754,7 +754,7 @@ function PaymentStatusPage() {
     };
     poll();
     return () => { cancelled = true; if(timer) clearTimeout(timer); };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const card = (children) => (
     <div className="min-h-screen flex items-center justify-center bg-navy p-4">
