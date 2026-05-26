@@ -183,7 +183,7 @@ function HeroSection() {
     };
     fetchSlots();
     return () => { mounted = false; };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <section className="relative bg-navy text-white pt-20 pb-32 clip-diagonal overflow-hidden">
@@ -592,7 +592,7 @@ function ChatbotWidget() {
 
   useEffect(() => {
     if(scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [messages, scrollRef]);
+  }, [messages]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const send = async (text) => {
     if(!text.trim()) return;
