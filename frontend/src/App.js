@@ -235,10 +235,12 @@ function ProblemSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-3xl md:text-4xl font-display font-bold text-navy mb-4">
-            Kenapa Beli Ebook Prompt Sakti Tidak Cukup?
+            Kenapa Beli Ebook Prompt Biasa Tidak Cukup?
           </h2>
           <p className="text-lg text-slate-600 max-w-3xl mx-auto">
-            Framework iRDR bukan kumpulan prompt. Ini adalah protokol kolaborasi manusia-AI yang memastikan setiap output bisa Anda pertanggungjawabkan di sidang.
+            Prompt biasa memberi Anda kalimat. Framework iRDR memberi Anda sistem —
+            protokol kolaborasi manusia-AI yang memastikan setiap output bisa Anda
+            pertanggungjawabkan di sidang.
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
