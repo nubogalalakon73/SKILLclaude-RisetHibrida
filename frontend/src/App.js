@@ -485,17 +485,40 @@ function CheckoutModal({ open, setOpen, selectedPlan }) {
       const res = await fetch(`${API_URL}/api/create-payment`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          product: selectedPlan.id,
-          amount: selectedPlan.price,
-          customer: data
-        })
+        body: JSON.stringify({ product: selectedPlan.id, customer: data })
       });
       const result = await res.json();
-      if(result.paymentUrl) {
-        window.location.href = result.paymentUrl;
+      if (!result.snap_token) throw new Error(result.detail || 'Snap token tidak ditemukan');
+
+      sessionStorage.setItem('rh_pending_order', JSON.stringify({
+        orderId: result.merchantOrderId,
+        email: data.email,
+        name: data.name,
+        product: selectedPlan.id,
+      }));
+
+      if (!window.snap) {
+        const script = document.createElement('script');
+        script.src = result.is_production
+          ? 'https://app.midtrans.com/snap/snap.js'
+          : 'https://app.sandbox.midtrans.com/snap/snap.js';
+        script.setAttribute('data-client-key', result.client_key);
+        await new Promise((resolve, reject) => {
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        });
       }
+
+      setOpen(false);
+      window.snap.pay(result.snap_token, {
+        onSuccess: () => { window.location.href = '/payment-status'; },
+        onPending: () => { window.location.href = '/payment-status'; },
+        onError:   () => { toast.error("Pembayaran gagal. Silakan coba lagi."); },
+        onClose:   () => {},
+      });
     } catch(err) {
+      console.error(err);
       toast.error("Gagal membuat pembayaran. Coba lagi.");
     }
   };
@@ -696,57 +719,115 @@ function LandingPage() {
   );
 }
 
-function MockPaymentPage() {
-  const [searchParams] = useSearchParams();
-  const orderId = searchParams.get('orderId');
-  const amount = searchParams.get('amount');
-  const navigate = useNavigate();
+function PaymentStatusPage() {
+  const stored = (() => {
+    try { return JSON.parse(sessionStorage.getItem('rh_pending_order') || 'null'); } catch { return null; }
+  })();
 
-  const handlePay = async () => {
-    await fetch(`${API_URL}/api/payment-callback`, {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ merchantOrderId: orderId, resultCode: "00" })
-    });
-    navigate('/payment-success');
-  };
+  const [status, setStatus] = useState('loading');
+  const [order, setOrder] = useState(null);
+  const startedAt = useRef(Date.now());
+  const POLL_INTERVAL = 4000;
+  const POLL_MAX_MS = 5 * 60_000;
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-      <div className="bg-white p-8 rounded-xl shadow-xl max-w-sm w-full text-center">
-        <h2 className="text-2xl font-bold mb-4">Mock Duitku Payment</h2>
-        <p className="mb-2">Order ID: {orderId}</p>
-        <p className="text-xl font-bold text-navy mb-8">Amount: Rp {Number(amount).toLocaleString('id-ID')}</p>
-        <Button className="w-full mb-4" variant="primary" onClick={handlePay} data-testid="mock-pay-btn">Simulate Successful Payment</Button>
-        <Button className="w-full" variant="outline" onClick={() => navigate('/')}>Cancel Payment</Button>
-      </div>
+  useEffect(() => {
+    if (!stored?.orderId || !stored?.email) { setStatus('error'); return; }
+    let cancelled = false;
+    let timer = null;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/order-status?orderId=${stored.orderId}&email=${encodeURIComponent(stored.email)}`);
+        if (cancelled) return;
+        const data = await res.json();
+        setOrder(data);
+        if (data.status === 'paid') { setStatus('success'); return; }
+        if (['failed', 'failure', 'cancel', 'expire', 'deny'].includes(data.status)) { setStatus('failed'); return; }
+        if (Date.now() - startedAt.current > POLL_MAX_MS) { setStatus('timeout'); return; }
+        timer = setTimeout(poll, POLL_INTERVAL);
+      } catch(e) {
+        if (cancelled) return;
+        setStatus('error');
+      }
+    };
+    poll();
+    return () => { cancelled = true; if(timer) clearTimeout(timer); };
+  }, []);
+
+  const card = (children) => (
+    <div className="min-h-screen flex items-center justify-center bg-navy p-4">
+      <div className="bg-white text-navy p-10 rounded-2xl shadow-2xl max-w-md w-full text-center">{children}</div>
     </div>
   );
-}
 
-function PaymentSuccessPage() {
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-navy p-4 text-white">
-      <div className="bg-white text-navy p-10 rounded-2xl shadow-2xl max-w-md w-full text-center">
-        <CheckCircle size={64} className="text-whatsapp mx-auto mb-6" weight="fill" />
-        <h2 className="text-3xl font-display font-bold mb-2">Pembayaran Berhasil!</h2>
-        <p className="text-slate-600 mb-6">Terima kasih! Link download telah dikirim ke email Anda. Cek folder spam jika tidak menerima dalam 5 menit.</p>
-        <Button className="w-full" variant="primary" onClick={() => window.location.href='/'} data-testid="success-home-btn">Kembali ke Beranda</Button>
-      </div>
-    </div>
+  if (status === 'loading') return card(
+    <>
+      <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin mx-auto mb-6"/>
+      <h2 className="text-2xl font-bold mb-2">Memverifikasi Pembayaran...</h2>
+      <p className="text-slate-500">Menunggu konfirmasi dari Midtrans</p>
+    </>
+  );
+
+  if (status === 'success') return card(
+    <>
+      <CheckCircle size={64} className="text-whatsapp mx-auto mb-6" weight="fill"/>
+      <h2 className="text-3xl font-display font-bold mb-2">Pembayaran Berhasil!</h2>
+      <p className="text-slate-600 mb-6">Terima kasih, {order?.customer?.name || stored?.name}! File siap diunduh.</p>
+      <Button className="w-full mb-3" variant="primary" onClick={() => window.location.href = `/download/${order?.downloadToken}`} data-testid="download-btn">
+        Akses File Download
+      </Button>
+      <Button className="w-full" variant="outline" onClick={() => window.location.href='/'} data-testid="home-btn">
+        Kembali ke Beranda
+      </Button>
+      <p className="text-xs text-slate-400 mt-4">Simpan halaman ini atau link download untuk akses ulang.</p>
+    </>
+  );
+
+  if (status === 'failed') return card(
+    <>
+      <WarningCircle size={64} className="text-red-500 mx-auto mb-6" weight="fill"/>
+      <h2 className="text-3xl font-bold mb-2">Pembayaran Gagal</h2>
+      <p className="text-slate-600 mb-6">Pembayaran tidak berhasil. Silakan coba lagi.</p>
+      <Button className="w-full" variant="primary" onClick={() => window.location.href='/'} data-testid="retry-btn">Coba Lagi</Button>
+    </>
+  );
+
+  if (status === 'timeout') return card(
+    <>
+      <WarningCircle size={64} className="text-gold mx-auto mb-6" weight="fill"/>
+      <h2 className="text-2xl font-bold mb-2">Konfirmasi Tertunda</h2>
+      <p className="text-slate-600 mb-2">Bank butuh waktu lebih lama. Refresh atau hubungi admin.</p>
+      <p className="text-sm text-slate-400 mb-6 font-mono">Order ID: {stored?.orderId}</p>
+      <Button className="w-full mb-3" variant="primary" onClick={() => window.location.reload()} data-testid="refresh-btn">Refresh</Button>
+      <Button className="w-full" variant="outline" onClick={() => window.open(WA_LINK)} data-testid="wa-btn">Hubungi Admin WA</Button>
+    </>
+  );
+
+  return card(
+    <>
+      <WarningCircle size={64} className="text-red-500 mx-auto mb-6" weight="fill"/>
+      <h2 className="text-2xl font-bold mb-2">Tidak Dapat Memuat Status</h2>
+      <p className="text-slate-600 mb-6">Silakan hubungi admin via WhatsApp.</p>
+      <Button className="w-full" variant="outline" onClick={() => window.open(WA_LINK)} data-testid="wa-btn">Hubungi Admin WA</Button>
+    </>
   );
 }
 
 function DownloadPage() {
   const { token } = useParams();
   const [status, setStatus] = useState('loading');
+  const [order, setOrder] = useState(null);
 
   useEffect(() => {
     let mounted = true;
     const validate = async () => {
       try {
         const res = await fetch(`${API_URL}/api/download/${token}`);
-        if (mounted) setStatus(res.ok ? 'success' : 'error');
+        const data = await res.json();
+        if (mounted) {
+          if (res.ok) { setOrder(data); setStatus('success'); }
+          else setStatus('error');
+        }
       } catch (e) {
         if (mounted) setStatus('error');
       }
@@ -758,19 +839,31 @@ function DownloadPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="bg-white p-10 rounded-2xl shadow-xl max-w-md w-full text-center">
-        {status === 'loading' && <p>Validating token...</p>}
+        {status === 'loading' && <p className="text-slate-500">Memvalidasi akses...</p>}
         {status === 'success' && (
           <>
             <CheckCircle size={64} className="text-whatsapp mx-auto mb-4" weight="fill"/>
-            <h2 className="text-2xl font-bold mb-4">Download Siap</h2>
-            <Button className="w-full" onClick={() => toast.success("Mendownload file...")} data-testid="download-btn">Unduh File Anda</Button>
+            <h2 className="text-2xl font-bold mb-2">Download Siap</h2>
+            <p className="text-slate-500 mb-1">Hai, {order?.customerName}!</p>
+            <p className="text-sm text-slate-400 mb-6 capitalize">Paket: {order?.product}</p>
+            <p className="text-sm text-slate-500 mb-6 bg-gold/10 border border-gold/30 rounded p-3">
+              File digital akan segera tersedia di sini. Tim kami juga mengirimkan link ke email Anda.
+              Untuk pertanyaan, hubungi WhatsApp 08998553333.
+            </p>
+            <Button className="w-full mb-3" variant="primary" onClick={() => window.open(WA_LINK)} data-testid="download-btn">
+              Konfirmasi via WhatsApp
+            </Button>
+            <Button className="w-full" variant="outline" onClick={() => window.location.href='/'} data-testid="home-btn">
+              Kembali ke Beranda
+            </Button>
           </>
         )}
         {status === 'error' && (
           <>
             <WarningCircle size={64} className="text-red-500 mx-auto mb-4" weight="fill"/>
-            <h2 className="text-2xl font-bold mb-4">Token Tidak Valid / Expired</h2>
-            <p className="text-slate-500">Silakan hubungi admin.</p>
+            <h2 className="text-2xl font-bold mb-4">Token Tidak Valid</h2>
+            <p className="text-slate-500 mb-6">Silakan hubungi admin via WhatsApp.</p>
+            <Button variant="outline" onClick={() => window.open(WA_LINK)} data-testid="wa-btn">Hubungi Admin WA</Button>
           </>
         )}
       </div>
@@ -785,8 +878,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/mock-payment" element={<MockPaymentPage />} />
-          <Route path="/payment-success" element={<PaymentSuccessPage />} />
+          <Route path="/payment-status" element={<PaymentStatusPage />} />
+          <Route path="/payment-success" element={<PaymentStatusPage />} />
           <Route path="/download/:token" element={<DownloadPage />} />
         </Routes>
       </BrowserRouter>
