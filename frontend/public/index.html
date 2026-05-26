@@ -37,7 +37,22 @@
     </head>
     <body>
         <noscript>You need to enable JavaScript to run this app.</noscript>
-        <div id="root"></div>
+        <div id="root">
+          <div id="js-fallback" style="padding:30px;font-family:monospace;background:#fffbe6;border:2px solid orange;margin:20px;border-radius:8px">
+            <b>Loading...</b> Jika pesan ini masih muncul setelah 5 detik, JavaScript gagal terload.<br>
+            Kemungkinan penyebab: file JS tidak ditemukan (404) atau parse error.<br>
+            <small id="js-fallback-timer">Menunggu JS...</small>
+          </div>
+        </div>
+        <script>
+          var _t = 0;
+          var _iv = setInterval(function() {
+            _t++;
+            var el = document.getElementById('js-fallback-timer');
+            if (el) el.textContent = 'Sudah ' + _t + ' detik...';
+            if (_t >= 10) clearInterval(_iv);
+          }, 1000);
+        </script>
         <!--
       This HTML file is a template.
       If you open it directly in the browser, you will see an empty page.
